@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="title">
+  <title id="title">NEXORA mark</title>
+  <defs>
+    <linearGradient id="violet" x1="10" y1="8" x2="54" y2="57" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A69BFF"/>
+      <stop offset=".48" stop-color="#7565FF"/>
+      <stop offset="1" stop-color="#4B3BD1"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="15" y1="14" x2="48" y2="49" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#C8C2FF"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="19" fill="#111226"/>
+  <path d="M13 46V18.5C13 16.57 15.27 15.55 16.71 16.84L43 40.5V20C43 18.34 44.34 17 46 17H49V45.5C49 47.43 46.73 48.45 45.29 47.16L19 23.5V44C19 45.66 17.66 47 16 47H13V46Z" fill="url(#violet)"/>
+  <path d="M17 18L47 45" stroke="url(#glow)" stroke-width="2.2" stroke-linecap="round" opacity=".92"/>
+  <circle cx="49" cy="15" r="4" fill="#A69BFF"/>
+  <circle cx="49" cy="15" r="7" stroke="#8D80FF" stroke-opacity=".25" stroke-width="2"/>
+</svg>

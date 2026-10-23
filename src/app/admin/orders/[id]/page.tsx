@@ -1,0 +1,32 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { ArrowLeft, Clock3, ExternalLink, History, PackageCheck } from "lucide-react";
+import { getSessionUser } from "@/lib/auth/session";
+import { db } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+const money = (value: bigint) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(value));
+const statusLabel: Record<string, string> = { PENDING: "Menunggu", SUBMITTING: "Mengirim ke provider", SUBMISSION_UNKNOWN: "Perlu rekonsiliasi", PROCESSING: "Diproses", IN_PROGRESS: "Berjalan", COMPLETED: "Selesai", PARTIAL: "Sebagian selesai", CANCELED: "Dibatalkan", FAILED: "Gagal" };
+const statusClass = (status: string) => status === "COMPLETED" ? "is-active" : ["FAILED", "CANCELED", "SUBMISSION_UNKNOWN"].includes(status) ? "is-danger" : "is-pending";
+
+export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const admin = await getSessionUser();
+  if (!admin) redirect("/login?next=/admin/orders");
+  if (admin.role !== "ADMIN") redirect("/dashboard");
+  const { id } = await params;
+  const order = await db.order.findUnique({ where: { id }, include: { user: { select: { id: true, username: true, email: true } }, service: { include: { provider: { select: { name: true } } } }, statusHistory: { orderBy: { createdAt: "desc" }, take: 100 }, refunds: { orderBy: { createdAt: "desc" } } } });
+  if (!order) notFound();
+  return <main className="container admin-page" style={{ paddingBlock: 32 }}>
+    <div className="admin-page-heading"><div><div className="eyebrow">Detail transaksi</div><h1>Pesanan {order.internalReference}</h1><p className="muted">Detail operasional dan jejak perubahan status. Status provider tidak diubah manual dari halaman ini.</p></div><Link href="/admin/orders" className="btn btn-quiet"><ArrowLeft size={15}/> Kembali ke pesanan</Link></div>
+    {order.status === "SUBMISSION_UNKNOWN" && <section className="panel" style={{ padding: 18, marginBottom: 18, borderColor: "var(--danger, #dc6464)" }}><strong>Perlu rekonsiliasi provider</strong><p className="muted" style={{ margin: "6px 0 0", lineHeight: 1.6 }}>Jangan kirim ulang pesanan secara otomatis. Periksa panel provider menggunakan ID provider atau referensi internal untuk memastikan apakah pesanan sudah diterima.</p></section>}
+    <section className="admin-summary-grid"><article className="panel admin-summary-card"><span className="muted"><PackageCheck size={15}/> Status pesanan</span><strong><span className={`admin-status-chip ${statusClass(order.status)}`}>{statusLabel[order.status] ?? order.status}</span></strong><small className="muted">Diperbarui {order.updatedAt.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</small></article><article className="panel admin-summary-card"><span className="muted">Biaya pengguna</span><strong>{money(order.charge)}</strong><small className="muted">Jumlah: {order.quantity.toLocaleString("id-ID")}</small></article><article className="panel admin-summary-card"><span className="muted"><Clock3 size={15}/> Dibuat</span><strong style={{ fontSize: 16 }}>{order.createdAt.toLocaleDateString("id-ID", { dateStyle: "medium" })}</strong><small className="muted">{order.createdAt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</small></article></section>
+    <section className="panel" style={{ padding: 22, marginBottom: 18 }}><div className="admin-table-heading"><div><h2>Informasi pesanan</h2><p className="muted">Data tersimpan pada sistem dan provider.</p></div></div><dl className="admin-order-detail-grid">
+      <div><dt>Referensi internal</dt><dd>{order.internalReference}</dd></div><div><dt>ID provider</dt><dd>{order.providerOrderId ?? "Belum tersedia"}</dd></div>
+      <div><dt>Pengguna</dt><dd><Link href={`/admin/users?q=${encodeURIComponent(order.user.username)}`}>{order.user.username}</Link><small>{order.user.email}</small></dd></div><div><dt>Layanan</dt><dd>{order.service.name}<small>{order.service.provider.name}</small></dd></div>
+      <div><dt>Jumlah</dt><dd>{order.quantity.toLocaleString("id-ID")}</dd></div><div><dt>Pemeriksaan provider terakhir</dt><dd>{order.lastProviderCheckAt ? order.lastProviderCheckAt.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "Belum pernah dicatat"}</dd></div>
+      <div className="admin-order-target"><dt>Target URL</dt><dd><span>{order.targetUrl}</span>{/^https?:\/\//i.test(order.targetUrl) && <a href={order.targetUrl} target="_blank" rel="noreferrer" aria-label="Buka target di tab baru"><ExternalLink size={14}/></a>}</dd></div>
+    </dl></section>
+    <section className="panel admin-table-panel"><div className="admin-table-heading"><div><h2><History size={17} style={{ display: "inline", verticalAlign: "-3px", marginRight: 7 }}/>Riwayat status</h2><p className="muted">Hingga 100 perubahan terbaru, termasuk sumber dan catatan jika tersedia.</p></div></div><div className="admin-table-scroll"><table className="admin-data-table"><thead><tr><th>Waktu</th><th>Dari</th><th>Menjadi</th><th>Sumber</th><th>Catatan</th></tr></thead><tbody>{order.statusHistory.map((event) => <tr key={event.id}><td>{event.createdAt.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</td><td>{event.fromStatus ? statusLabel[event.fromStatus] ?? event.fromStatus : "—"}</td><td><span className={`admin-status-chip ${statusClass(event.toStatus)}`}>{statusLabel[event.toStatus] ?? event.toStatus}</span></td><td>{event.source}</td><td>{event.note ?? "—"}</td></tr>)}{!order.statusHistory.length && <tr><td colSpan={5} className="admin-empty-cell">Belum ada riwayat status yang tersimpan untuk pesanan ini.</td></tr>}</tbody></table></div></section>
+    {order.refunds.length > 0 && <section className="panel admin-table-panel" style={{ marginTop: 18 }}><div className="admin-table-heading"><div><h2>Riwayat refund</h2><p className="muted">Pengembalian dana yang tercatat untuk pesanan ini.</p></div></div><div className="admin-table-scroll"><table className="admin-data-table"><thead><tr><th>Waktu</th><th>Nominal</th><th>Alasan</th><th>Dicatat oleh</th></tr></thead><tbody>{order.refunds.map((refund) => <tr key={refund.id}><td>{refund.createdAt.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</td><td><strong>{money(refund.amount)}</strong></td><td>{refund.reason}</td><td>{refund.createdBy}</td></tr>)}</tbody></table></div></section>}
+  </main>;
+}
